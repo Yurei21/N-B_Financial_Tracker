@@ -11,8 +11,8 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Orders::Table)
                     .if_not_exists()
-                    .col(pk_auto(Post::Id))
-                    .col(string(Post::Title))
+                    .col(pk_auto(Orders::OrderId))
+                    .col(string(Orders::PatientName))
                     .col(string(Post::Text))
                     .to_owned(),
             )
