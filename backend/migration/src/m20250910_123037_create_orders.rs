@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(Orders::OrderId))
                     .col(string(Orders::PatientName))
-                    .col(string(Post::Text))
+                    .col(int(Orders::TotalAmount))
                     .to_owned(),
             )
             .await
