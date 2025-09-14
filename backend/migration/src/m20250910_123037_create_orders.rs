@@ -11,11 +11,11 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Orders::Table)
                     .if_not_exists()
-                    .col(pk_auto(Orders::OrderId))
-                    .col(string(Orders::PatientName))
-                    .col(i32(Orders::TotalAmount))
-                    .col((Orders::))
-                    .to_owned(),
+                    .col(ColumnDef::new(Orders::OrderId).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Orders::PatientName).string().not_null())
+                    .col(ColumnDef::new(Orders::OrderDate).date().not_null())
+                    .col(ColumnDef::new(Orders::TotalAmount).decimal(12,2).not_null())
+                    .to_owned()
             )
             .await
     }
@@ -28,9 +28,10 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Post {
+enum Orders {
     Table,
-    Id,
-    Title,
-    Text,
+    OrderId,
+    PatientName,
+    OrderDate,
+    TotalAmount,
 }
