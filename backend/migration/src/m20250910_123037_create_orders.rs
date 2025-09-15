@@ -14,6 +14,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Orders::OrderId).integer().not_null().auto_increment().primary_key())
                     .col(ColumnDef::new(Orders::PatientName).string().not_null())
                     .col(ColumnDef::new(Orders::OrderDate).date().not_null())
+                    .col(ColumnDef::new(Orders::Description).string().not_null())
                     .col(ColumnDef::new(Orders::TotalAmount).decimal(12,2).not_null())
                     .to_owned()
             )
@@ -32,6 +33,7 @@ enum Orders {
     Table,
     OrderId,
     PatientName,
+    
     OrderDate,
     TotalAmount,
 }

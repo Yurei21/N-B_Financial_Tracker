@@ -11,7 +11,18 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Invoices::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new())
+                    .col(ColumnDef::new(Invoices::InvoiceId).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Invoices::OrderId).integer().not_null())
+                    .col(ColumnDef::new(Invoices::TransactionId).string().not_null())
+                    .col(ColumnDef::new(Invoices::Description).string())
+                    .col(ColumnDef::new(Invoices::InvoiceDate).date().not_null())
+                    .col(ColumnDef::new(Invoices::TotalAmount).decimal(12,2).not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Invoices::Table, Invoices::OrderId)
+                            .to(Orders::Table, Orders::OrderId)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
                     .to_owned(),
             )
             .await
@@ -25,9 +36,12 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Post {
+enum Invoices {
     Table,
-    Id,
-    Title,
-    Text,
+    InvoiceId,
+    OrderId,
+    TransactionId,
+    Description,
+    InvoiceDate,
+    TotalAmount,
 }

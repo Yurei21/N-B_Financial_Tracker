@@ -6,26 +6,25 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Replace the sample below with your own migration scripts
-        todo!();
-
         manager
             .create_table(
                 Table::create()
-                    .table(Post::Table)
+                    .table(Reports::Table)
                     .if_not_exists()
-                    .col(pk_auto(Post::Id))
-                    .col(string(Post::Title))
-                    .col(string(Post::Text))
+                    .col(ColumnDef::new(Reports::ReportId).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Reports::Month).date().not_null())
+                    .col(ColumnDef::new(Reports::TotalOrders).integer().not_null())
+                    .col(ColumnDef::new(Reports::TotalIncome).decimal().not_null())
+                    .col(ColumnDef::new(Reports::TotalExpenses).decimal().not_null())
+                    .col(ColumnDef::new(Reports::NetProfit).decimal().not_null())
+                    .col(ColumnDef::new(Reports::GeneratedAt).timestamp().default(Value::current_timestamp()).not_null())
+                    .col(ColumnDef::new(Reports::DailyData).json().not_null())
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Replace the sample below with your own migration scripts
-        todo!();
-
         manager
             .drop_table(Table::drop().table(Post::Table).to_owned())
             .await
@@ -33,9 +32,14 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Post {
+enum Reports {
     Table,
-    Id,
-    Title,
-    Text,
+    ReportId,
+    Month,
+    TotalOrders,
+    TotalIncome,
+    TotalExpenses,
+    NetProfit,
+    GeneratedAt,
+    DailyData,
 }
