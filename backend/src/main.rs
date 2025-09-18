@@ -1,6 +1,6 @@
 mod db;
 
-use actix_web::get{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
 use sqlx::SqlitePool;
 
