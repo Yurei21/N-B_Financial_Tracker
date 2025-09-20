@@ -6,6 +6,8 @@ use actix_cors::Cors;
 use config::Config;
 use db::connect;
 
+
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let config = Config::from_env();
