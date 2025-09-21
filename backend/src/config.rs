@@ -10,7 +10,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_env() -> self {
+    pub fn from_env() -> Self {
         dotenv().ok();
 
         let database_url = env::var("DATABASE_URL")
@@ -33,6 +33,7 @@ impl Config {
         Self{
             database_url,
             host,
+            port,
             registration_enabled,
             registration_secret,
         }
