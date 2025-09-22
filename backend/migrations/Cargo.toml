@@ -1,0 +1,17 @@
+[package]
+name = "migration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# SeaORM Migration
+sea-orm-migration = "0.12"
+
+# Needed for models/entities
+sea-orm = { version = "0.12", features = ["macros"] }
+
+# For async runtime
+async-std = { version = "1", features = ["attributes"] }
+
+# For environment variables (optional, if you want .env here too)
+dotenvy = "0.15"
