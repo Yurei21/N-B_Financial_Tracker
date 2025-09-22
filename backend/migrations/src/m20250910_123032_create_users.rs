@@ -8,7 +8,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .create_table(
-                table::create().if_not_exists().col(
+                Table::create().if_not_exists().col(
                     ColumnDef::new(Users::UserId)
                     .integer()
                     .not_null()
@@ -23,13 +23,13 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .drop_table(Table::drop().table(Users::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum Users {
+pub enum Users {
     Table,
     UserId,
     UserName,

@@ -1,4 +1,6 @@
 use sea_orm_migration::{prelude::*, schema::*};
+use crate::m20250910_123037_create_orders::Orders as OrdersTable;
+
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -16,11 +18,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Invoices::TransactionId).string().not_null())
                     .col(ColumnDef::new(Invoices::Description).string())
                     .col(ColumnDef::new(Invoices::InvoiceDate).date().not_null())
-                    .col(ColumnDef::new(Invoices::TotalAmount).decimal(12,2).not_null())
+                    .col(ColumnDef::new(Invoices::TotalAmount).decimal().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .from(Invoices::Table, Invoices::OrderId)
-                            .to(Orders::Table, Orders::OrderId)
+                            .to(OrdersTable::Table, OrdersTable::OrderId)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -30,13 +32,13 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .drop_table(Table::drop().table(Invoices::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum Invoices {
+pub enum Invoices {
     Table,
     InvoiceId,
     OrderId,

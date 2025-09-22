@@ -1,4 +1,5 @@
 use sea_orm_migration::{prelude::*, schema::*};
+use sea_query::Expr;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -17,7 +18,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Reports::TotalIncome).decimal().not_null())
                     .col(ColumnDef::new(Reports::TotalExpenses).decimal().not_null())
                     .col(ColumnDef::new(Reports::NetProfit).decimal().not_null())
-                    .col(ColumnDef::new(Reports::GeneratedAt).timestamp().default(Value::current_timestamp()).not_null())
+                    .col(ColumnDef::new(Reports::GeneratedAt)
+                        .timestamp()
+                        .default("CURRENT_TIMESTAMP")
+                        .not_null()
+                    )
                     .col(ColumnDef::new(Reports::DailyData).json().not_null())
                     .to_owned(),
             )
@@ -26,13 +31,13 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .drop_table(Table::drop().table(Reports::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum Reports {
+pub enum Reports {
     Table,
     ReportId,
     Month,
