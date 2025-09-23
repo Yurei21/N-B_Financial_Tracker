@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Web framework
+actix-cors = "0.7.1"
 actix-web = "4"
 
 # SeaORM ORM
