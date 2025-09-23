@@ -4,14 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# SeaORM Migration
-sea-orm-migration = "0.12"
+sea-orm-migration = { version = "0.12", features = ["runtime-tokio-rustls", "sqlx-sqlite", "sqlx-postgres"] }
 
-# Needed for models/entities
-sea-orm = { version = "0.12", features = ["macros"] }
+[lib]
+name = "migration"
+path = "src/lib.rs"
 
-# For async runtime
-async-std = { version = "1", features = ["attributes"] }
-
-# For environment variables (optional, if you want .env here too)
-dotenvy = "0.15"
+[[bin]]
+name = "migration"
+path = "src/main.rs"
