@@ -42,6 +42,24 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Orders::OrderDate).date().not_null())
                     .col(ColumnDef::new(Orders::TotalAmount).decimal_len(12, 2).not_null())
                     .col(ColumnDef::new(Orders::Description).string().not_null())
+                    // created_by
+                    .col(ColumnDef::new(Orders::CreatedBy).integer().null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-orders-createdby")
+                            .from(Orders::Table, Orders::CreatedBy)
+                            .to(Users::Table, Users::UserId)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    // modified_by
+                    .col(ColumnDef::new(Orders::ModifiedBy).integer().null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-orders-modifiedby")
+                            .from(Orders::Table, Orders::ModifiedBy)
+                            .to(Users::Table, Users::UserId)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -63,6 +81,24 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Expenses::Label).string().not_null())
                     .col(ColumnDef::new(Expenses::Amount).decimal_len(12, 2).not_null())
                     .col(ColumnDef::new(Expenses::ExpenseDate).date().not_null())
+                    // created_by
+                    .col(ColumnDef::new(Expenses::CreatedBy).integer().null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-expenses-createdby")
+                            .from(Expenses::Table, Expenses::CreatedBy)
+                            .to(Users::Table, Users::UserId)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    // modified_by
+                    .col(ColumnDef::new(Expenses::ModifiedBy).integer().null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-expenses-modifiedby")
+                            .from(Expenses::Table, Expenses::ModifiedBy)
+                            .to(Users::Table, Users::UserId)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -83,7 +119,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Invoices::OrderId).integer().not_null())
                     .col(ColumnDef::new(Invoices::TransactionId).string().not_null())
                     .col(ColumnDef::new(Invoices::InvoiceDate).date().not_null())
-                    .col(ColumnDef::new(Invoices::TotalAmount).decimal_len(12, 2).not_null())
+                    .col(
+                        ColumnDef::new(Invoices::TotalAmount)
+                            .decimal_len(12, 2)
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Invoices::Description).string().not_null())
                     .foreign_key(
                         ForeignKey::create()
@@ -111,9 +151,21 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Reports::Month).date().not_null())
                     .col(ColumnDef::new(Reports::TotalOrders).integer().not_null())
-                    .col(ColumnDef::new(Reports::TotalIncome).decimal_len(12, 2).not_null())
-                    .col(ColumnDef::new(Reports::TotalExpenses).decimal_len(12, 2).not_null())
-                    .col(ColumnDef::new(Reports::NetProfit).decimal_len(12, 2).not_null())
+                    .col(
+                        ColumnDef::new(Reports::TotalIncome)
+                            .decimal_len(12, 2)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Reports::TotalExpenses)
+                            .decimal_len(12, 2)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Reports::NetProfit)
+                            .decimal_len(12, 2)
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(Reports::GeneratedAt)
                             .date_time()
@@ -124,16 +176,25 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.drop_table(Table::drop().table(Reports::Table).to_owned()).await?;
-        manager.drop_table(Table::drop().table(Invoices::Table).to_owned()).await?;
-        manager.drop_table(Table::drop().table(Expenses::Table).to_owned()).await?;
-        manager.drop_table(Table::drop().table(Orders::Table).to_owned()).await?;
-        manager.drop_table(Table::drop().table(Users::Table).to_owned()).await?;
+        manager
+            .drop_table(Table::drop().table(Reports::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Invoices::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Expenses::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Orders::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(Users::Table).to_owned())
+            .await?;
         Ok(())
     }
 }
@@ -154,6 +215,8 @@ enum Orders {
     OrderDate,
     TotalAmount,
     Description,
+    CreatedBy,  
+    ModifiedBy, 
 }
 
 #[derive(Iden)]
@@ -164,6 +227,8 @@ enum Expenses {
     Label,
     Amount,
     ExpenseDate,
+    CreatedBy,
+    ModifiedBy,
 }
 
 #[derive(Iden)]
