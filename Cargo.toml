@@ -1,5 +1,0 @@
-[workspace]
-members = [
-    "backend",
-    "backend/migration"
-]
