@@ -1,6 +1,7 @@
 use dotenvy::dotenv;
 use std::env;
 
+#[derive(Clone, Debug)]
 pub struct Config {
     pub database_url: String,
     pub database_url_pg: String,
