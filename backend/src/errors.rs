@@ -24,3 +24,22 @@ pub enum AppError {
 struct ErrorResponse {
     error: String,
 }
+
+impl ResponseError for AppError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR
+            AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+
+    fn error_response(&self) -> HttpResponse {
+        let body = ErrorResponse {
+            error: self.to_string(),
+        };
+        HttpResponse::build(self.status_code()).json(body)
+    }
+}
