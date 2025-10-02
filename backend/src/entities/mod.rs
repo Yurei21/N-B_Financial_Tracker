@@ -5,5 +5,6 @@ pub mod prelude;
 pub mod expenses;
 pub mod invoices;
 pub mod orders;
+pub mod registration_codes;
 pub mod reports;
 pub mod users;

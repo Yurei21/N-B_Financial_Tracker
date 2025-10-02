@@ -2,6 +2,7 @@ use actix_web::{App, HttpServer, web, HttpResponse};
 use backend::config::Config;
 
 mod config;
+mod db;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

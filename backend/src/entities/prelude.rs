@@ -3,5 +3,6 @@
 pub use super::expenses::Entity as Expenses;
 pub use super::invoices::Entity as Invoices;
 pub use super::orders::Entity as Orders;
+pub use super::registration_codes::Entity as RegistrationCodes;
 pub use super::reports::Entity as Reports;
 pub use super::users::Entity as Users;
