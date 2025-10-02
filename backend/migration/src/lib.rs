@@ -6,6 +6,7 @@ mod m20250928_033942_create_expenses;
 mod m20250928_033942_create_invoices;
 mod m20250928_033942_create_reports;
 mod m20251002_093643_create_registration_codes;
+mod m20251002_201324_create_registration_code_resets;
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -18,6 +19,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250928_033942_create_invoices::Migration),
             Box::new(m20250928_033942_create_reports::Migration),
             Box::new(m20251002_093643_create_registration_codes::Migration),
+            Box::new(m20251002_201324_create_registration_code_resets::Migration),
         ]
     }
 }

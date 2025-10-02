@@ -1,5 +1,14 @@
-use actix_web::web::{self, ServiceConfig};
+use actix_web::web;
 use crate::handlers;
+
+use crate::handlers::{
+    users,
+    orders,
+    expenses,
+    invoices,
+    dashboard,
+    reports,
+};
 
 pub fn configure(cfg: &mut ServiceConfig) {
     cfg.
