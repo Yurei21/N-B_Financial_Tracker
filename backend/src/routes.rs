@@ -3,6 +3,15 @@ use crate::handlers::{
     users, orders, expenses, invoices, reports, dashboard,
 };
 
+pub fn init_routes(cfg: &mut web::ServiceConfig) {
+    users::init(cfg);
+    orders::init(cfg);
+    expenses::init(cfg);
+    invoices::init(cfg);
+    reports::init(cfg);
+    dashboard::init(cfg);
+}
+
 pub fn configure(cfg: &mut ServiceConfig) {
     cfg
         .service(
