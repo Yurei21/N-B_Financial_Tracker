@@ -1,4 +1,6 @@
 use actix_web::{get, post, web, HttpResponse, Responder};
+use sea_orm::DatabaseConnection;
+use crate::{services::users, errors::AppError};
 
 #[post("/register")]
 async fn register() -> impl Responder {

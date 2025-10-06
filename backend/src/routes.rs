@@ -1,61 +1,38 @@
-use actix_web::web::{self, ServiceConfig};
+use actix_web::web;
 use crate::handlers::{
     users, orders, expenses, invoices, reports, dashboard,
 };
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
-    users::init(cfg);
-    orders::init(cfg);
-    expenses::init(cfg);
-    invoices::init(cfg);
-    reports::init(cfg);
-    dashboard::init(cfg);
-}
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            // 👤 User routes
+            .service(users::register)
+            .service(users::login)
+            .service(users::forgot_password)
+            .service(users::forgot_registration_code)
 
-pub fn configure(cfg: &mut ServiceConfig) {
-    cfg
-        .service(
-            web::scope("/api")
-                // ---- Health check ----
-                .service(web::resource("/health").route(web::get().to(handlers::health)))
+            // 📦 Orders routes
+            .service(orders::create_order)
+            .service(orders::list_orders)
+            .service(orders::update_order)
+            .service(orders::delete_order)
 
-                // ---- Auth-free endpoints ----
-                .service(web::resource("/register").route(web::post().to(handlers::register)))
-                .service(web::resource("/login").route(web::post().to(handlers::login)))
-                .service(web::resource("/forgot-password").route(web::post().to(handlers::forgot_password)))
-                .service(web::resource("/forgot-registration-code").route(web::post().to(handlers::forgot_registration_code)))
-                .service(web::resource("/reset-registration-code").route(web::post().to(handlers::reset_registration_code)))
+            // 💸 Expenses routes
+            .service(expenses::create_expense)
+            .service(expenses::list_expenses)
+            .service(expenses::update_expense)
+            .service(expenses::delete_expense)
 
-                // ---- Protected endpoints (JWT) ----
-                .service(
-                    web::scope("/orders")
-                        .route("", web::post().to(handlers::create_order))
-                        .route("", web::get().to(handlers::list_orders))
-                        .route("/{id}", web::get().to(handlers::get_order))
-                        .route("/{id}", web::put().to(handlers::update_order))
-                        .route("/{id}", web::delete().to(handlers::delete_order))
-                )
-                .service(
-                    web::scope("/expenses")
-                        .route("", web::post().to(handlers::create_expense))
-                        .route("", web::get().to(handlers::list_expenses))
-                        .route("/{id}", web::get().to(handlers::get_expense))
-                        .route("/{id}", web::put().to(handlers::update_expense))
-                        .route("/{id}", web::delete().to(handlers::delete_expense))
-                )
-                .service(
-                    web::scope("/invoices")
-                        .route("", web::get().to(handlers::list_invoices))
-                        .route("/{id}", web::get().to(handlers::get_invoice))
-                )
-                .service(
-                    web::scope("/reports")
-                        .route("", web::get().to(handlers::list_reports))
-                        .route("/monthly", web::post().to(handlers::generate_monthly_report))
-                )
-                .service(
-                    web::scope("/dashboard")
-                        .route("/summary", web::get().to(handlers::dashboard_summary))
-                )
-        );
+            // 🧾 Invoices routes
+            .service(invoices::list_invoices)
+            .service(invoices::get_invoice_by_order)
+
+            // 📊 Reports routes
+            .service(reports::generate_report)
+            .service(reports::list_reports)
+
+            // 📈 Dashboard summary
+            .service(dashboard::summary)
+    );
 }

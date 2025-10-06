@@ -28,7 +28,7 @@ struct ErrorResponse {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self {
-            AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR
+            AppError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::NotFound => StatusCode::NOT_FOUND,
