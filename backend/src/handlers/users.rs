@@ -1,17 +1,11 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse};
 use sea_orm::DatabaseConnection;
-use crate::{services::users, errors::AppError};
+use serde::Deserialize;
 
-#[post("/register")]
-async fn register() -> impl Responder {
-    HttpResponse::Ok().body("User register endpoint")
-}
+use crate::services::users as user_service;
+use crate::errors::AppError;
 
-#[post("/login")]
-async fn login() -> impl Responder {
-    HttpResponse::Ok().body("User login endpoint")
-}
-
-pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(register).service(login);
+#[derive(Deserialize)]
+pub struct AuthPayload {
+    pub username 
 }

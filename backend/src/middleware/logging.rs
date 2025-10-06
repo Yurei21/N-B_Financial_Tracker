@@ -1,11 +1,11 @@
-use actix_service::{Service, Transform};
-use actix_web::{dev::{ServiceRequest, ServiceResponse}, Error};
-use futures::future::{ok, Ready, LocalBoxFuture};
+use actix_web::{
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error,
+};
+use futures_util::future::{ok, Ready, LocalBoxFuture};
+use std::rc::Rc;
 use std::task::{Context, Poll};
-use std::time::Instant;
-use tracing::info;
 
-/// Logging middleware that records method, path, and response time
 pub struct Logging;
 
 impl<S, B> Transform<S, ServiceRequest> for Logging
@@ -20,12 +20,14 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(LoggingMiddleware { service })
+        ok(LoggingMiddleware {
+            service: Rc::new(service),
+        })
     }
 }
 
 pub struct LoggingMiddleware<S> {
-    service: S,
+    service: Rc<S>,
 }
 
 impl<S, B> Service<ServiceRequest> for LoggingMiddleware<S>
@@ -42,38 +44,14 @@ where
     }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let method = req.method().clone();
         let path = req.path().to_string();
-        let start = Instant::now();
-
-        let fut = self.service.call(req);
+        let method = req.method().clone();
+        let svc = Rc::clone(&self.service);
 
         Box::pin(async move {
-            let result = fut.await;
-            let duration = start.elapsed();
-
-            match &result {
-                Ok(res) => {
-                    info!(
-                        "➡️ {} {} -> {} ({} ms)",
-                        method,
-                        path,
-                        res.status(),
-                        duration.as_millis()
-                    );
-                }
-                Err(err) => {
-                    info!(
-                        "❌ {} {} -> ERROR: {} ({} ms)",
-                        method,
-                        path,
-                        err,
-                        duration.as_millis()
-                    );
-                }
-            }
-
-            result
+            let res = svc.call(req).await?;
+            println!("➡️  [{}] {}", method, path);
+            Ok(res)
         })
     }
 }

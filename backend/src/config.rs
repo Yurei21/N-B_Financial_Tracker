@@ -4,7 +4,6 @@ use std::env;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub database_url: String,
-    pub database_url_pg: String,
     pub jwt_secret: String,
     pub server_host: String,
     pub server_port: u16,
