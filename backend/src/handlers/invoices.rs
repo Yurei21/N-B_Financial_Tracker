@@ -1,16 +1,42 @@
-use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse};
+use sea_orm::DatabaseConnection;
 
-#[get("/invoices")]
-async fn list_invoices() -> impl Responder {
-    HttpResponse::Ok().body("List invoices endpoint")
+use crate::{
+    middleware::auth::AuthenticatedUser,
+    services::invoices,
+    errors::AppError,
+};
+
+/// GET /invoices
+/// Fetch all invoices (for the logged-in user)
+pub async fn list_invoices(
+    db: web::Data<DatabaseConnection>,
+    user: AuthenticatedUser,
+) -> Result<HttpResponse, AppError> {
+    let result = invoices::list_invoices(&db, user.user_id).await?;
+    Ok(HttpResponse::Ok().json(result))
 }
 
-#[get("/invoices/{id}")]
-async fn get_invoice(path: web::Path<i32>) -> impl Responder {
-    HttpResponse::Ok().body(format!("Get invoice {}", path.into_inner()))
+/// GET /invoices/{id}
+/// Fetch a single invoice by its ID
+pub async fn get_invoice(
+    db: web::Data<DatabaseConnection>,
+    user: AuthenticatedUser,
+    path: web::Path<i32>,
+) -> Result<HttpResponse, AppError> {
+    let id = path.into_inner();
+    let invoice = invoices::get_invoice(&db, id, user.user_id).await?;
+    Ok(HttpResponse::Ok().json(invoice))
 }
 
-pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(list_invoices)
-       .service(get_invoice);
+/// GET /invoices/order/{order_id}
+/// Fetch the invoice linked to a specific order
+pub async fn get_invoice_by_order(
+    db: web::Data<DatabaseConnection>,
+    user: AuthenticatedUser,
+    path: web::Path<i32>,
+) -> Result<HttpResponse, AppError> {
+    let order_id = path.into_inner();
+    let invoice = invoices::get_invoice_by_order(&db, order_id, user.user_id).await?;
+    Ok(HttpResponse::Ok().json(invoice))
 }
