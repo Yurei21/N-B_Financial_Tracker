@@ -1,53 +1,56 @@
 use actix_web::{web, HttpResponse};
+use chrono::NaiveDate;
+use serde::Deserialize;
 use sea_orm::DatabaseConnection;
 
 use crate::{
     middleware::auth::AuthenticatedUser,
-    services::reports,
+    services::reports::{ReportsService, MonthlyReport as ServiceMonthlyReport},
     errors::AppError,
 };
 
-/// POST /reports/generate
-/// Generate or refresh a report for a specific month (YYYY-MM)
+#[derive(Debug, Deserialize)]
+pub struct GenerateReportRequest {
+    pub month: String, // YYYY-MM
+}
+
+/// POST /reports
+/// Generate a monthly report
 pub async fn generate_report(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
-    body: web::Json<reports::GenerateReportRequest>,
+    payload: web::Json<GenerateReportRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let report = reports::generate_report(&db, user.user_id, body.into_inner()).await?;
+    let service = ReportsService::new(db.get_ref().clone());
+
+    // Parse YYYY-MM into NaiveDate (first day of month)
+    let month = NaiveDate::parse_from_str(&(payload.month.clone() + "-01"), "%Y-%m-%d")?;
+
+    let report = service.generate_monthly_report(month).await?;
     Ok(HttpResponse::Ok().json(report))
 }
 
 /// GET /reports
-/// List all generated reports
+/// Fetch all generated reports
 pub async fn list_reports(
     db: web::Data<DatabaseConnection>,
-    _user: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
-    let list = reports::list_reports(&db).await?;
-    Ok(HttpResponse::Ok().json(list))
+    let service = ReportsService::new(db.get_ref().clone());
+    let reports = service.get_all_reports().await?;
+    Ok(HttpResponse::Ok().json(reports))
 }
 
-/// GET /reports/{id}
-/// Fetch a single report by ID
-pub async fn get_report(
-    db: web::Data<DatabaseConnection>,
-    path: web::Path<i32>,
-    _user: AuthenticatedUser,
-) -> Result<HttpResponse, AppError> {
-    let id = path.into_inner();
-    let report = reports::get_report(&db, id).await?;
-    Ok(HttpResponse::Ok().json(report))
-}
-
-/// GET /reports/month/{month}
+/// GET /reports/{month}
 /// Fetch report for a specific month (YYYY-MM)
 pub async fn get_report_by_month(
     db: web::Data<DatabaseConnection>,
-    month: web::Path<String>,
-    _user: AuthenticatedUser,
+    path: web::Path<String>,
 ) -> Result<HttpResponse, AppError> {
-    let month_str = month.into_inner();
-    let report = reports::get_report_by_month(&db, &month_str).await?;
+    let month_str = path.into_inner();
+    let service = ReportsService::new(db.get_ref().clone());
+
+    // Parse YYYY-MM into NaiveDate (first day of month)
+    let month = NaiveDate::parse_from_str(&(month_str + "-01"), "%Y-%m-%d")?;
+
+    let report = service.get_report_by_month(month).await?;
     Ok(HttpResponse::Ok().json(report))
 }

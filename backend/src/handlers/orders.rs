@@ -1,17 +1,18 @@
 use actix_web::{web, HttpResponse};
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
+use chrono::NaiveDate;
 
 use crate::{
     middleware::auth::AuthenticatedUser,
-    services::orders,
+    services::orders::{OrdersService, CreateOrderRequest as ServiceCreateRequest, UpdateOrderRequest as ServiceUpdateRequest},
     errors::AppError,
-}
+};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateOrderRequest {
     pub patient_name: String,
-    pub order_date: String,      
+    pub order_date: String,      // YYYY-MM-DD
     pub total_amount: f64,
     pub description: String,
 }
@@ -19,46 +20,52 @@ pub struct CreateOrderRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateOrderRequest {
     pub patient_name: Option<String>,
-    pub order_date: Option<String>,
+    pub order_date: Option<String>, // YYYY-MM-DD
     pub total_amount: Option<f64>,
     pub description: Option<String>,
 }
 
 /// POST /orders
-/// Create a new order (auto-links to logged-in user)
 pub async fn create_order(
     db: web::Data<DatabaseConnection>,
     user: AuthenticatedUser,
     payload: web::Json<CreateOrderRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let order = orders::create_order(&db, user.user_id, payload.into_inner()).await?;
+    let service = OrdersService::new(db.get_ref().clone());
+
+    let req = ServiceCreateRequest {
+        patient_name: payload.patient_name.clone(),
+        order_date: NaiveDate::parse_from_str(&payload.order_date, "%Y-%m-%d")?,
+        total_amount: payload.total_amount,
+        description: payload.description.clone(),
+        created_by: user.user_id,
+    };
+
+    let order = service.create_order(req).await?;
     Ok(HttpResponse::Ok().json(order))
 }
 
 /// GET /orders
-/// Fetch all orders for the logged-in user
 pub async fn list_orders(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
-    let result = orders::list_orders(&db, user.user_id).await?;
+    let service = OrdersService::new(db.get_ref().clone());
+    let result = service.get_orders().await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 /// GET /orders/{id}
-/// Fetch a single order by ID (only if created by user)
 pub async fn get_order(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let order = orders::get_order(&db, id, user.user_id).await?;
+    let service = OrdersService::new(db.get_ref().clone());
+    let order = service.get_order_by_id(id).await?;
     Ok(HttpResponse::Ok().json(order))
 }
 
 /// PUT /orders/{id}
-/// Update an existing order
 pub async fn update_order(
     db: web::Data<DatabaseConnection>,
     user: AuthenticatedUser,
@@ -66,18 +73,29 @@ pub async fn update_order(
     payload: web::Json<UpdateOrderRequest>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let updated = orders::update_order(&db, id, user.user_id, payload.into_inner()).await?;
+    let service = OrdersService::new(db.get_ref().clone());
+
+    let req = ServiceUpdateRequest {
+        patient_name: payload.patient_name.clone(),
+        order_date: match &payload.order_date {
+            Some(d) => Some(NaiveDate::parse_from_str(d, "%Y-%m-%d")?),
+            None => None,
+        },
+        total_amount: payload.total_amount,
+        description: payload.description.clone(),
+    };
+
+    let updated = service.update_order(id, req, user.user_id).await?;
     Ok(HttpResponse::Ok().json(updated))
 }
 
 /// DELETE /orders/{id}
-/// Delete an order (cascade deletes invoice)
 pub async fn delete_order(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    orders::delete_order(&db, id, user.user_id).await?;
+    let service = OrdersService::new(db.get_ref().clone());
+    service.delete_order(id).await?;
     Ok(HttpResponse::Ok().json("Order deleted successfully"))
 }

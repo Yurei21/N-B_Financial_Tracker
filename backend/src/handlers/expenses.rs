@@ -1,10 +1,11 @@
 use actix_web::{web, HttpResponse};
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
+use chrono::NaiveDate;
 
 use crate::{
     middleware::auth::AuthenticatedUser,
-    services::expenses,
+    services::expenses::{ExpensesService, CreateExpenseRequest as ServiceCreateRequest, UpdateExpenseRequest as ServiceUpdateRequest},
     errors::AppError,
 };
 
@@ -21,44 +22,50 @@ pub struct UpdateExpenseRequest {
     pub description: Option<String>,
     pub label: Option<String>,
     pub amount: Option<f64>,
-    pub expense_date: Option<String>,
+    pub expense_date: Option<String>, // YYYY-MM-DD
 }
 
 /// POST /expenses
-/// Create a new expense entry (auto-linked to the logged-in user)
 pub async fn create_expense(
     db: web::Data<DatabaseConnection>,
     user: AuthenticatedUser,
     payload: web::Json<CreateExpenseRequest>,
 ) -> Result<HttpResponse, AppError> {
-    let expense = expenses::create_expense(&db, user.user_id, payload.into_inner()).await?;
+    let service = ExpensesService::new(db.get_ref().clone());
+
+    let req = ServiceCreateRequest {
+        description: payload.description.clone(),
+        label: payload.label.clone(),
+        amount: payload.amount,
+        expense_date: NaiveDate::parse_from_str(&payload.expense_date, "%Y-%m-%d")?,
+        created_by: user.user_id,
+    };
+
+    let expense = service.create_expense(req).await?;
     Ok(HttpResponse::Ok().json(expense))
 }
 
 /// GET /expenses
-/// Fetch all expenses created by the user
 pub async fn list_expenses(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
-    let result = expenses::list_expenses(&db, user.user_id).await?;
+    let service = ExpensesService::new(db.get_ref().clone());
+    let result = service.get_expenses().await?;
     Ok(HttpResponse::Ok().json(result))
 }
 
 /// GET /expenses/{id}
-/// Fetch a single expense (only if owned by the user)
 pub async fn get_expense(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let expense = expenses::get_expense(&db, id, user.user_id).await?;
+    let service = ExpensesService::new(db.get_ref().clone());
+    let expense = service.get_expense_by_id(id).await?;
     Ok(HttpResponse::Ok().json(expense))
 }
 
 /// PUT /expenses/{id}
-/// Update an existing expense
 pub async fn update_expense(
     db: web::Data<DatabaseConnection>,
     user: AuthenticatedUser,
@@ -66,18 +73,29 @@ pub async fn update_expense(
     payload: web::Json<UpdateExpenseRequest>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    let updated = expenses::update_expense(&db, id, user.user_id, payload.into_inner()).await?;
+    let service = ExpensesService::new(db.get_ref().clone());
+
+    let req = ServiceUpdateRequest {
+        description: payload.description.clone(),
+        label: payload.label.clone(),
+        amount: payload.amount,
+        expense_date: match &payload.expense_date {
+            Some(d) => Some(NaiveDate::parse_from_str(d, "%Y-%m-%d")?),
+            None => None,
+        },
+    };
+
+    let updated = service.update_expense(id, req, user.user_id).await?;
     Ok(HttpResponse::Ok().json(updated))
 }
 
 /// DELETE /expenses/{id}
-/// Delete a user-owned expense
 pub async fn delete_expense(
     db: web::Data<DatabaseConnection>,
-    user: AuthenticatedUser,
     path: web::Path<i32>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
-    expenses::delete_expense(&db, id, user.user_id).await?;
+    let service = ExpensesService::new(db.get_ref().clone());
+    service.delete_expense(id).await?;
     Ok(HttpResponse::Ok().json("Expense deleted successfully"))
 }
