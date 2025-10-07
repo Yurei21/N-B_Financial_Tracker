@@ -1,14 +1,23 @@
 use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, ColumnTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
-use argon2::{self, Config as ArgonConfig};
+use rand::{Rng, thread_rng};
+use argon2::{Argon2, PasswordHasher, PasswordVerifier, password_hash::{SaltString, PasswordHash}};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use chrono::{Utc, Duration};
 
+use crate::Config as ArgonConfig;
 use crate::{
-    entities::{users, registration_code},
+    entities::{users, registration_codes},
     errors::AppError,
     config::Config,
+    middleware::auth::Claims,
 };
+
+#[derive(Clone)]
+pub struct UserService {
+    pub db: DatabaseConnection,
+    pub jwt_secret: String,
+}
 
 #[derive(Deserialize)]
 pub struct RegisterRequest {
@@ -23,6 +32,13 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub username: String,
+    pub registration_code: String,
+    pub new_password: String,
+}
+
 #[derive(Serialize)]
 pub struct AuthResponse {
     pub token: String,
@@ -30,92 +46,134 @@ pub struct AuthResponse {
     pub username: String,
 }
 
-pub async fn register_user(
-    db: &DatabaseConnection,
-    config: &Config,
-    req: RegisterRequest
-) -> Result<AuthResponse, AppError>{
-    //Check registration code validity
-    let reg_code = registration_code::Entity::find()
-        .filter(registration_code)
-        .one(db)
-        .await?
-        .ok_or(AppError::BadRequest("Invalid Registration code".into()))?;
-    
-    //Check if username exists
-    let existing = users::Entity::find()
-        .filter(users::Column::Username.eq(req.username.clone()))
-        .one(db)
+impl UserService {
+    pub fn new(db: DatabaseConnection, jwt_secret: String) -> Self {
+        Self { db, jwt_secret }
+    }
+
+    pub async fn register_user(&self, req: RegisterRequest) -> Result<AuthResponse, AppError> {
+        // Check registration code validity
+        let reg_code = registration_codes::Entity::find()
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::BadRequest("Invalid registration code".into()))?;
+
+        if reg_code.code != req.registration_code {
+            return Err(AppError::BadRequest("Invalid registration code".into()));
+        }
+
+        // Check if username exists
+        let existing = users::Entity::find()
+            .filter(users::Column::Username.eq(req.username.clone()))
+            .one(&self.db)
+            .await?;
+
+        if existing.is_some() {
+            return Err(AppError::BadRequest("Username already exists".into()));
+        }
+
+        // Generate salt
+        let mut rng = thread_rng();
+        let salt_bytes: [u8; 16] = rng.r#gen();
+        let salt = SaltString::b64_encode(&salt_bytes).map_err(|_| AppError::InternalError)?;
+
+        // Hash password
+        let argon2 = Argon2::default();
+        let hash = argon2
+            .hash_password(req.password.as_bytes(), &salt)
+            .map_err(|_| AppError::InternalError)?
+            .to_string();
+
+        let new_user = users::ActiveModel {
+            username: Set(req.username.clone()),
+            password_hash: Set(hash),
+            ..Default::default()
+        }
+        .insert(&self.db)
         .await?;
 
-    if existing.is_some() {
-        return Err(AppError::BadRequest("Username already exists".into()));
+        // Generate JWT
+        let token = self.generate_jwt(new_user.user_id)?;
+
+        Ok(AuthResponse {
+            token,
+            user_id: new_user.user_id,
+            username: new_user.username,
+        })
     }
 
-    //Hash Password
-    let salt = rand::random::<[u8, 16]>();
-    let hash = argon2::hash_encoded(req.password.as_bytes(), &salt, &ArgonConfig::default())
-        .map_err(|_| AppError::Internal("Failed to hash the password".into()))?;
+    pub async fn login_user(&self, req: LoginRequest) -> Result<AuthResponse, AppError> {
+        let user = users::Entity::find()
+            .filter(users::Column::Username.eq(req.username.clone()))
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::BadRequest("Invalid username or password".into()))?;
 
-    let new_user = users::ActiveModel {
-        username: Set(req.username.clone()),
-        password_hash: Set(hash.clone),
-        ..Default::default()
-    }
-    .insert(db)
-    .await?;
+        let argon2 = Argon2::default();
+        let parsed_hash = PasswordHash::new(&user.password_hash).map_err(|_| AppError::InternalError)?;
+        let valid = argon2.verify_password(req.password.as_bytes(), &parsed_hash).is_ok();
 
-    let token = generate_jwt(config, new_user.user_id)?;
+        if !valid {
+            return Err(AppError::BadRequest("Invalid username or password".into()));
+        }
 
-    Ok(AuthResponse {
-        token,
-        user_id,
-        username,
-    })
-}
+        let token = self.generate_jwt(user.user_id)?;
 
-pub async fn login_user(
-    db: &DatabaseConnection,
-    config: &Config,
-    req: LoginRequest,
-) -> Result<AuthResponse, AppError>{
-    let user = users::Entity::find()
-        .filter(users::Column::Username.eq(req.username.clone()))
-        .one(db)
-        .await?
-        .ok_or(AppError::BadRequest("Invalid username or Password".into()))?;
-
-    let valid = argon2::verify_encoded(&user.password_hash, req.password.as_bytes())
-        .map_err(|_| AppError::Internal("Password verification failed".into()))?;
-    
-    if !valid {
-        return Err(AppError::BadRequest("Invalid username or Password".into()));
+        Ok(AuthResponse {
+            token,
+            user_id: user.user_id,
+            username: user.username,
+        })
     }
 
-    let token = generate_jwt(config, user.user_id)?;
+    pub async fn forgot_password(&self, req: ForgotPasswordRequest) -> Result<(), AppError> {
+        // Find user by username
+        let mut user: users::ActiveModel = users::Entity::find()
+            .filter(users::Column::Username.eq(req.username.clone()))
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::BadRequest("User not found".into()))?
+            .into();
 
-    Ok(AuthResponse {
-        token,
-        user_id: user.user_id,
-        username: user.username
-    })
-}
+        // Validate registration code
+        let reg_code = registration_codes::Entity::find()
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::BadRequest("Invalid registration code".into()))?;
 
-fn generate_jwt (config: &Config, user_id: i32) -> Result<String, AppError> {
-    use crate::middleware::auth::Claims
+        if reg_code.code != req.registration_code {
+            return Err(AppError::BadRequest("Invalid registration code".into()));
+        }
 
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(24))
-        .expect("valid timestamp")
-        .timestamp() as usize;
+        // Hash new password
+        let mut rng = thread_rng();
+        let salt_bytes: [u8; 16] = rng.r#gen();
+        let salt = SaltString::b64_encode(&salt_bytes).map_err(|_| AppError::InternalError)?;
+        let argon2 = Argon2::default();
+        let hash = argon2
+            .hash_password(req.new_password.as_bytes(), &salt)
+            .map_err(|_| AppError::InternalError)?
+            .to_string();
 
-    let claims = Claims { user_id, exp: expiration };
-    let token = encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(config.jwt_secret.as_bytes()),
-    )
-    .map_err(|_| AppError::Internal("Failed to encode JWT".into()))?;
+        // Update user password
+        user.password_hash = Set(hash);
+        user.update(&self.db).await?;
 
-    Ok(token)
+        Ok(())
+    }
+
+    fn generate_jwt(&self, user_id: i32) -> Result<String, AppError> {
+        let expiration = Utc::now()
+            .checked_add_signed(Duration::hours(24))
+            .ok_or(AppError::InternalError)?
+            .timestamp() as usize;
+
+        let claims = Claims { user_id, exp: expiration };
+        encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
+        )
+        .map_err(|_| AppError::InternalError)
+    }
 }

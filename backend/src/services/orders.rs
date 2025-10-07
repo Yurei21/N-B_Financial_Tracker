@@ -1,95 +1,114 @@
-use sea_orm::{
-    ActiveModelTrait, EntityTrait, QueryOrder, Set, DatabaseConnection,
-    ColumnTrait, QueryFilter,
-};
+use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, Set, ColumnTrait, QueryFilter, ActiveValue};
+use serde::{Deserialize, Serialize};
 use chrono::NaiveDate;
-use crate::entities::{orders, invoices};
-use crate::errors::AppError;
-use crate::utils::generate_transaction_id; // utility for invoice ID (we’ll add this below)
+use crate::{
+    entities::{orders, invoices, users},
+    errors::AppError,
+};
 
-/// Create a new order and auto-generate its invoice
-pub async fn create_order(
-    db: &DatabaseConnection,
-    patient_name: String,
-    order_date: NaiveDate,
-    total_amount: f64,
-    description: String,
-    created_by: Option<i32>,
-) -> Result<orders::Model, AppError> {
-    // Save order
-    let new_order = orders::ActiveModel {
-        patient_name: Set(patient_name.clone()),
-        order_date: Set(order_date),
-        total_amount: Set(total_amount),
-        description: Set(description.clone()),
-        created_by: Set(created_by),
-        modified_by: Set(created_by),
-        ..Default::default()
-    };
-
-    let order = new_order.insert(db).await?;
-
-    // Generate invoice
-    let transaction_id = generate_transaction_id();
-    let invoice_date = chrono::Local::now().naive_local().date();
-
-    let new_invoice = invoices::ActiveModel {
-        order_id: Set(order.order_id),
-        transaction_id: Set(transaction_id),
-        invoice_date: Set(invoice_date),
-        total_amount: Set(order.total_amount),
-        description: Set(order.description.clone()),
-        ..Default::default()
-    };
-
-    new_invoice.insert(db).await?;
-
-    Ok(order)
+#[derive(Clone)]
+pub struct OrdersService {
+    pub db: DatabaseConnection,
 }
 
-/// Retrieve all orders (sorted by date descending)
-pub async fn get_all_orders(db: &DatabaseConnection) -> Result<Vec<orders::Model>, AppError> {
-    let list = orders::Entity::find()
-        .order_by_desc(orders::Column::OrderDate)
-        .all(db)
-        .await?;
-    Ok(list)
+#[derive(Deserialize)]
+pub struct CreateOrderRequest {
+    pub patient_name: String,
+    pub order_date: NaiveDate,
+    pub total_amount: f64,
+    pub description: String,
+    pub created_by: i32, // user_id
 }
 
-/// Update order by ID
-pub async fn update_order(
-    db: &DatabaseConnection,
-    order_id: i32,
-    patient_name: String,
-    order_date: NaiveDate,
-    total_amount: f64,
-    description: String,
-    modified_by: Option<i32>,
-) -> Result<orders::Model, AppError> {
-    let mut order = orders::Entity::find_by_id(order_id)
-        .one(db)
-        .await?
-        .ok_or(AppError::NotFound)?;
-
-    order.patient_name = patient_name;
-    order.order_date = order_date;
-    order.total_amount = total_amount;
-    order.description = description;
-
-    let mut active: orders::ActiveModel = order.into();
-    active.modified_by = Set(modified_by);
-
-    Ok(active.update(db).await?)
+#[derive(Deserialize)]
+pub struct UpdateOrderRequest {
+    pub patient_name: Option<String>,
+    pub order_date: Option<NaiveDate>,
+    pub total_amount: Option<f64>,
+    pub description: Option<String>,
 }
 
-/// Delete order and cascade delete its invoice
-pub async fn delete_order(db: &DatabaseConnection, order_id: i32) -> Result<(), AppError> {
-    let order = orders::Entity::find_by_id(order_id)
-        .one(db)
-        .await?
-        .ok_or(AppError::NotFound)?;
+impl OrdersService {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
 
-    let active: orders::ActiveModel = order.into();
-    active.delete(db).await?;
-    Ok(())
+    /// Create a new order and auto-generate an invoice
+    pub async fn create_order(&self, req: CreateOrderRequest) -> Result<orders::Model, AppError> {
+        let new_order = orders::ActiveModel {
+            patient_name: Set(req.patient_name.clone()),
+            order_date: Set(req.order_date),
+            total_amount: Set(req.total_amount),
+            description: Set(req.description.clone()),
+            created_by: Set(Some(req.created_by)),
+            modified_by: Set(Some(req.created_by)),
+            ..Default::default()
+        };
+
+        let order = new_order.insert(&self.db).await?;
+
+        // Auto-generate invoice
+        let transaction_id: String = format!("TXN{}", order.order_id); // simple placeholder
+        let invoice = invoices::ActiveModel {
+            order_id: Set(order.order_id),
+            transaction_id: Set(transaction_id),
+            invoice_date: Set(req.order_date),
+            total_amount: Set(req.total_amount),
+            description: Set(req.description),
+            ..Default::default()
+        };
+
+        invoice.insert(&self.db).await?;
+
+        Ok(order)
+    }
+
+    /// Fetch all orders
+    pub async fn get_orders(&self) -> Result<Vec<orders::Model>, AppError> {
+        let all_orders = orders::Entity::find()
+            .all(&self.db)
+            .await?;
+        Ok(all_orders)
+    }
+
+    /// Fetch single order by ID
+    pub async fn get_order_by_id(&self, order_id: i32) -> Result<orders::Model, AppError> {
+        let order = orders::Entity::find_by_id(order_id)
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        Ok(order)
+    }
+
+    /// Update order
+    pub async fn update_order(&self, order_id: i32, req: UpdateOrderRequest, modified_by: i32) -> Result<orders::Model, AppError> {
+        let mut order: orders::ActiveModel = orders::Entity::find_by_id(order_id)
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::NotFound)?
+            .into();
+
+        if let Some(name) = req.patient_name { order.patient_name = Set(name); }
+        if let Some(date) = req.order_date { order.order_date = Set(date); }
+        if let Some(amount) = req.total_amount { order.total_amount = Set(amount); }
+        if let Some(desc) = req.description { order.description = Set(desc); }
+
+        order.modified_by = Set(Some(modified_by));
+
+        let updated = order.update(&self.db).await?;
+        Ok(updated)
+    }
+
+    /// Delete order (cascade deletes invoice)
+    pub async fn delete_order(&self, order_id: i32) -> Result<(), AppError> {
+        let order: orders::ActiveModel = orders::Entity::find_by_id(order_id)
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::NotFound)?
+            .into();
+
+        // SeaORM cascade delete handles invoice if FK is set
+        order.delete(&self.db).await?;
+        Ok(())
+    }
 }

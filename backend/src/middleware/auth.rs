@@ -20,7 +20,6 @@ pub struct AuthenticatedUser {
 impl FromRequest for AuthenticatedUser {
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self, Error>>>>;
-    type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         // Clone the app data so we can use it inside async
