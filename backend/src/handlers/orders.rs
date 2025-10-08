@@ -35,7 +35,8 @@ pub async fn create_order(
 
     let req = ServiceCreateRequest {
         patient_name: payload.patient_name.clone(),
-        order_date: NaiveDate::parse_from_str(&payload.order_date, "%Y-%m-%d")?,
+        order_date: NaiveDate::parse_from_str(&payload.order_date, "%Y-%m-%d")
+        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
         total_amount: payload.total_amount,
         description: payload.description.clone(),
         created_by: user.user_id,
@@ -78,8 +79,10 @@ pub async fn update_order(
     let req = ServiceUpdateRequest {
         patient_name: payload.patient_name.clone(),
         order_date: match &payload.order_date {
-            Some(d) => Some(NaiveDate::parse_from_str(d, "%Y-%m-%d")?),
-            None => None,
+            Some(d) => Some(
+                NaiveDate::parse_from_str(d, "%Y-%m-%d")
+                    .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
+            ),
         },
         total_amount: payload.total_amount,
         description: payload.description.clone(),

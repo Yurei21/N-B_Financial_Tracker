@@ -46,6 +46,12 @@ pub struct AuthResponse {
     pub username: String,
 }
 
+#[derive(Serialize)]
+pub struct UserResponse {
+    pub user_id: i32,
+    pub username: String,
+}
+
 impl UserService {
     pub fn new(db: DatabaseConnection, jwt_secret: String) -> Self {
         Self { db, jwt_secret }

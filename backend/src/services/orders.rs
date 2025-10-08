@@ -28,56 +28,105 @@ pub struct UpdateOrderRequest {
     pub description: Option<String>,
 }
 
+#[derive(Serialize)]
+pub struct CreateOrderResponse {
+    pub order_id: i32,
+    pub patient_name: String,
+    pub order_date: NaiveDate,
+    pub total_amount: f64,
+    pub description: String,
+    pub created_by: Option<i32>,
+}
+
+#[derive(Serialize)]
+pub struct AllOrderResponse {
+    pub order_id: i32,
+    pub patient_name: String,
+    pub order_date: NaiveDate,
+    pub total_amount: f64,
+    pub description: String,
+    pub created_by: Option<i32>,
+    pub modified_by: Option<i32>,
+}
+
+#[derive(Serialize)]
+pub struct GetOrderResponse {
+    pub order_id: i32,
+    pub patient_name: String,
+    pub order_date: NaiveDate,
+    pub total_amount: f64,
+    pub description: String,
+    pub created_by: Option<i32>,
+    pub modified_by: Option<i32>,
+}
+
 impl OrdersService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
-    /// Create a new order and auto-generate an invoice
-    pub async fn create_order(&self, req: CreateOrderRequest) -> Result<orders::Model, AppError> {
+    pub async fn create_order(&self, req: CreateOrderRequest) -> Result<CreateOrderResponse, AppError> {
         let new_order = orders::ActiveModel {
             patient_name: Set(req.patient_name.clone()),
             order_date: Set(req.order_date),
             total_amount: Set(req.total_amount),
             description: Set(req.description.clone()),
             created_by: Set(Some(req.created_by)),
-            modified_by: Set(Some(req.created_by)),
             ..Default::default()
-        };
+        }
+        .insert(&self.db)
+        .await?;
 
-        let order = new_order.insert(&self.db).await?;
-
-        // Auto-generate invoice
-        let transaction_id: String = format!("TXN{}", order.order_id); // simple placeholder
-        let invoice = invoices::ActiveModel {
-            order_id: Set(order.order_id),
-            transaction_id: Set(transaction_id),
-            invoice_date: Set(req.order_date),
-            total_amount: Set(req.total_amount),
-            description: Set(req.description),
-            ..Default::default()
-        };
-
-        invoice.insert(&self.db).await?;
-
-        Ok(order)
+        Ok(CreateOrderResponse {
+            order_id: new_order.order_id,
+            patient_name: new_order.patient_name,
+            order_date: new_order.order_date,
+            total_amount: new_order.total_amount,
+            description: new_order.description,
+            created_by: new_order.created_by,
+        })
     }
 
     /// Fetch all orders
-    pub async fn get_orders(&self) -> Result<Vec<orders::Model>, AppError> {
-        let all_orders = orders::Entity::find()
+    pub async fn get_orders(&self) -> Result<Vec<AllOrderResponse>, AppError> {
+        let orders = orders::Entity::find()
             .all(&self.db)
-            .await?;
-        Ok(all_orders)
+            .await
+            .map_err(AppError::from)?; // convert DbErr to AppError
+
+        let response = orders
+            .into_iter()
+            .map(|order| AllOrderResponse {
+                order_id: order.order_id,
+                patient_name: order.patient_name,
+                order_date: order.order_date,
+                total_amount: order.total_amount,
+                description: order.description,
+                created_by: order.created_by,
+                modified_by: order.modified_by,
+            })
+            .collect();
+
+        Ok(response)
     }
 
     /// Fetch single order by ID
-    pub async fn get_order_by_id(&self, order_id: i32) -> Result<orders::Model, AppError> {
-        let order = orders::Entity::find_by_id(order_id)
+    pub async fn get_order_by_id(&self, order_id: i32) -> Result<GetOrderResponse, AppError> {
+        let order = orders::Entity::find()
+            .filter(orders::Column::OrderId.eq(order_id))
             .one(&self.db)
             .await?
-            .ok_or(AppError::NotFound)?;
-        Ok(order)
+            .ok_or(AppError::NotFound("Order not found".into()))?;
+
+        Ok(GetOrderResponse {
+            order_id: order.order_id,
+            patient_name: order.patient_name,
+            order_date: order.order_date,
+            total_amount: order.total_amount,
+            description: order.description,
+            created_by: order.created_by,
+            modified_by: order.modified_by,
+        })
     }
 
     /// Update order

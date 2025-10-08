@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use crate::{
-    services::users::{UserService, RegisterRequest as ServiceRegisterRequest, LoginRequest as ServiceLoginRequest, ForgotPasswordRequest},
+    services::users::{UserService, RegisterRequest as ServiceRegisterRequest, LoginRequest as ServiceLoginRequest, ForgotPasswordRequest, UserResponse},
     entities::users,
     errors::AppError,
 };
@@ -79,7 +79,12 @@ pub async fn get_me(
         .await?
         .ok_or(AppError::NotFound("User not found".into()))?;
 
-    Ok(HttpResponse::Ok().json(user_data))
+    let response = UserResponse {
+        user_id: user_data.user_id,
+        username: user_data.username,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /forgot-password
