@@ -23,7 +23,8 @@ pub async fn generate_report(
     let service = ReportsService::new(db.get_ref().clone());
 
     // Parse YYYY-MM into NaiveDate (first day of month)
-    let month = NaiveDate::parse_from_str(&(payload.month.clone() + "-01"), "%Y-%m-%d")?;
+    let month = NaiveDate::parse_from_str(&(payload.month.clone() + "-01"), "%Y-%m-%d")
+    .map_err(|_| AppError::BadRequest("Invalid month format, expected YYYY-MM".into()))?;
 
     let report = service.generate_monthly_report(month).await?;
     Ok(HttpResponse::Ok().json(report))

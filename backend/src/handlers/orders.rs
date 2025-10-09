@@ -2,11 +2,13 @@ use actix_web::{web, HttpResponse};
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use chrono::NaiveDate;
+use serde_json::json;
 
 use crate::{
     middleware::auth::AuthenticatedUser,
     services::orders::{OrdersService, CreateOrderRequest as ServiceCreateRequest, UpdateOrderRequest as ServiceUpdateRequest},
     errors::AppError,
+    services::invoices::InvoicesService,
 };
 
 #[derive(Debug, Deserialize)]
@@ -36,15 +38,22 @@ pub async fn create_order(
     let req = ServiceCreateRequest {
         patient_name: payload.patient_name.clone(),
         order_date: NaiveDate::parse_from_str(&payload.order_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
+            .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
         total_amount: payload.total_amount,
         description: payload.description.clone(),
         created_by: user.user_id,
     };
 
-    let order = service.create_order(req).await?;
-    Ok(HttpResponse::Ok().json(order))
+    // Create order and auto-generate invoice
+    let (order, invoice) = service.create_order(req).await?;
+
+    // Return both order and invoice in JSON response
+    Ok(HttpResponse::Ok().json(json!({
+        "order": order,
+        "invoice": invoice
+    })))
 }
+
 
 /// GET /orders
 pub async fn list_orders(
@@ -83,13 +92,18 @@ pub async fn update_order(
                 NaiveDate::parse_from_str(d, "%Y-%m-%d")
                     .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
             ),
+            None => None,
         },
         total_amount: payload.total_amount,
         description: payload.description.clone(),
     };
 
-    let updated = service.update_order(id, req, user.user_id).await?;
-    Ok(HttpResponse::Ok().json(updated))
+    let (updated_order, updated_invoice) = service.update_order(id, req, user.user_id).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "order": updated_order,
+        "invoice": updated_invoice
+    })))
 }
 
 /// DELETE /orders/{id}

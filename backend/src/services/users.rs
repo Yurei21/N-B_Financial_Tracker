@@ -64,7 +64,7 @@ impl UserService {
             .await?
             .ok_or(AppError::BadRequest("Invalid registration code".into()))?;
 
-        if reg_code.code != req.registration_code {
+        if reg_code.code_hash != req.registration_code {
             return Err(AppError::BadRequest("Invalid registration code".into()));
         }
 
@@ -147,7 +147,7 @@ impl UserService {
             .await?
             .ok_or(AppError::BadRequest("Invalid registration code".into()))?;
 
-        if reg_code.code != req.registration_code {
+        if reg_code.code_hash != req.registration_code {
             return Err(AppError::BadRequest("Invalid registration code".into()));
         }
 

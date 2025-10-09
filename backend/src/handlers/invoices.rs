@@ -29,7 +29,8 @@ pub async fn create_invoice(
     let req = ServiceCreateRequest {
         order_id: payload.order_id,
         transaction_id: payload.transaction_id.clone(),
-        invoice_date: NaiveDate::parse_from_str(&payload.invoice_date, "%Y-%m-%d")?,
+        invoice_date: NaiveDate::parse_from_str(&payload.invoice_date, "%Y-%m-%d")
+            .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
         total_amount: payload.total_amount,
         description: payload.description.clone(),
     };
@@ -57,7 +58,7 @@ pub async fn get_invoice(
     let id = path.into_inner();
     let service = InvoicesService::new(db.get_ref().clone());
     let invoice = service.get_all_invoices().await?; // or filter by ID if needed
-    let invoice = invoice.into_iter().find(|i| i.id == id).ok_or(AppError::NotFound)?;
+    let invoice = invoice.into_iter().find(|i| i.invoice_id == id).ok_or(AppError::NotFound("Invoice not found.".into()))?;
     Ok(HttpResponse::Ok().json(invoice))
 }
 

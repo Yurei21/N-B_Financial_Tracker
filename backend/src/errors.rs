@@ -11,9 +11,6 @@ pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
 
-    //#[error("Date parse error: {0}")]
-   // DataParseError(#[from] chrono::ParseError)
-
     #[error("Bad request: {0}")]
     BadRequest(String),
 

@@ -37,7 +37,8 @@ pub async fn create_expense(
         description: payload.description.clone(),
         label: payload.label.clone(),
         amount: payload.amount,
-        expense_date: NaiveDate::parse_from_str(&payload.expense_date, "%Y-%m-%d")?,
+        expense_date: NaiveDate::parse_from_str(&payload.expense_date, "%Y-%m-%d")
+        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
         created_by: user.user_id,
     };
 
@@ -80,7 +81,10 @@ pub async fn update_expense(
         label: payload.label.clone(),
         amount: payload.amount,
         expense_date: match &payload.expense_date {
-            Some(d) => Some(NaiveDate::parse_from_str(d, "%Y-%m-%d")?),
+            Some(d) => Some(
+                NaiveDate::parse_from_str(d, "%Y-%m-%d")
+                    .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".into()))?,
+            ),
             None => None,
         },
     };
